@@ -80,8 +80,8 @@
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+<script setup lang="ts">
+import { ref, onMounted } from "vue";
 import { io } from "socket.io-client";
 
 interface User {
@@ -100,96 +100,65 @@ interface Message {
   message: string;
 }
 
-export default defineComponent({
-  setup() {
-    const nickname = ref("");
-    const user = ref<User | null>(null);
-    const channelName = ref("");
-    const currentChannel = ref<Channel | null>(null);
-    const message = ref("");
-    const messages = ref<Message[]>([]);
-    const socket = io("ws://127.0.0.1:5173");
+const socket = io("ws://127.0.0.1:5173");
 
-    const createUser = () => {
-      socket.emit("addUser", nickname.value, (newUser: User) => {
-        user.value = newUser;
-      });
-    };
+const nickname = ref("");
+const user = ref<User | null>(null);
+const channelName = ref("");
+const currentChannel = ref<Channel | null>(null);
+const message = ref("");
+const messages = ref<Message[]>([]);
 
-    const createChannel = () => {
-      if (user.value) {
-        socket.emit(
-          "createChannel",
-          { name: channelName.value, creatorId: user.value.id },
-          (newChannel: Channel) => {
-            currentChannel.value = newChannel;
-          }
-        );
-      }
-    };
+const createUser = () => {
+  socket.emit("addUser", nickname.value, (newUser: User) => {
+    user.value = newUser;
+  });
+};
 
-    const sendMessage = () => {
-      if (user.value && currentChannel.value) {
-        socket.emit("sendMessage", {
-          channelId: currentChannel.value.id,
-          userId: user.value.id,
-          message: message.value,
-        });
-        message.value = "";
-      }
-    };
-
-    const removeUser = (userId: string) => {
-      if (user.value && currentChannel.value) {
-        socket.emit("removeUser", {
-          channelId: currentChannel.value.id,
-          userId: userId,
-          removerId: user.value.id,
-        });
-      }
-    };
-
-    onMounted(() => {
-      socket.on("message", (data: { user: User; message: string }) => {
-        messages.value.push(data);
-      });
-
-      socket.on(
-        "userRemoved",
-        (data: { channelId: string; userId: string }) => {
-          if (
-            currentChannel.value &&
-            currentChannel.value.id === data.channelId
-          ) {
-            currentChannel.value.users = currentChannel.value.users.filter(
-              (u) => u.id !== data.userId
-            );
-          }
-        }
-      );
-
-      socket.on("userJoined", (data: { channelId: string; user: User }) => {
-        if (
-          currentChannel.value &&
-          currentChannel.value.id === data.channelId
-        ) {
-          currentChannel.value.users.push(data.user);
-        }
-      });
+const createChannel = () => {
+  if (user.value) {
+    socket.emit("createChannel", { name: channelName.value, creatorId: user.value.id }, (newChannel: Channel) => {
+      currentChannel.value = newChannel;
     });
+  }
+};
 
-    return {
-      nickname,
-      user,
-      channelName,
-      currentChannel,
-      message,
-      messages,
-      createUser,
-      createChannel,
-      sendMessage,
-      removeUser,
-    };
-  },
+const sendMessage = () => {
+  if (user.value && currentChannel.value) {
+    socket.emit("sendMessage", {
+      channelId: currentChannel.value.id,
+      userId: user.value.id,
+      message: message.value,
+    });
+    message.value = "";
+  }
+};
+
+const removeUser = (userId: string) => {
+  if (user.value && currentChannel.value) {
+    socket.emit("removeUser", {
+      channelId: currentChannel.value.id,
+      userId,
+      removerId: user.value.id,
+    });
+  }
+};
+
+onMounted(() => {
+  socket.on("message", (data: { user: User; message: string }) => {
+    messages.value.push(data);
+  });
+
+  socket.on("userRemoved", (data: { channelId: string; userId: string }) => {
+    if (currentChannel.value?.id === data.channelId) {
+      currentChannel.value.users = currentChannel.value.users.filter(u => u.id !== data.userId);
+    }
+  });
+
+  socket.on("userJoined", (data: { channelId: string; user: User }) => {
+    if (currentChannel.value?.id === data.channelId) {
+      currentChannel.value.users.push(data.user);
+    }
+  });
 });
 </script>
