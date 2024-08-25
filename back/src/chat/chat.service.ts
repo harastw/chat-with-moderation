@@ -20,6 +20,7 @@ export class ChatService {
   createChannel(name: string, creator: User): Channel {
     const channel = new Channel(name, creator);
     this.channels.push(channel);
+
     return channel;
   }
 
@@ -50,5 +51,9 @@ export class ChatService {
   getChannelUsers(channelId: string): User[] {
     const channel = this.channels.find((c) => c.id === channelId);
     return channel ? channel.users : [];
+  }
+
+  getAllChannels(): Channel[] {
+    return this.channels;
   }
 }
