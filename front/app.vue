@@ -16,7 +16,7 @@
     </div>
 
     <div v-else class="w-full max-w-lg">
-      <div class="mb-4">
+      <div v-if="!currentChannel" class="mb-4">
         <input
           v-model="channelName"
           type="text"
@@ -32,6 +32,24 @@
       </div>
 
       <div v-if="currentChannel" class="mb-4">
+        <div v-if="channels.length" class="w-full max-w-md mb-4">
+          <h2 class="text-xl font-bold mb-2">Channels</h2>
+          <ul>
+            <li
+              v-for="channel in channels"
+              :key="channel.id"
+              class="flex justify-between items-center p-2 bg-white rounded mb-1 shadow"
+            >
+              {{ channel.name }}
+              <button
+                @click="joinChannel(channel.id)"
+                class="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+              >
+                Join
+              </button>
+            </li>
+          </ul>
+        </div>
         <h2 class="text-xl font-bold mb-2">
           Channel: {{ currentChannel.name }}
         </h2>
@@ -100,14 +118,14 @@ interface Message {
   message: string;
 }
 
-const socket = io("ws://127.0.0.1:5173");
-
 const nickname = ref("");
 const user = ref<User | null>(null);
 const channelName = ref("");
 const currentChannel = ref<Channel | null>(null);
 const message = ref("");
 const messages = ref<Message[]>([]);
+const channels = ref<Channel[]>([]);
+const socket = io("ws://127.0.0.1:5173");
 
 const createUser = () => {
   socket.emit("addUser", nickname.value, (newUser: User) => {
@@ -117,9 +135,13 @@ const createUser = () => {
 
 const createChannel = () => {
   if (user.value) {
-    socket.emit("createChannel", { name: channelName.value, creatorId: user.value.id }, (newChannel: Channel) => {
-      currentChannel.value = newChannel;
-    });
+    socket.emit(
+      "createChannel",
+      { name: channelName.value, creatorId: user.value.id },
+      (newChannel: Channel) => {
+        currentChannel.value = newChannel;
+      }
+    );
   }
 };
 
@@ -138,27 +160,54 @@ const removeUser = (userId: string) => {
   if (user.value && currentChannel.value) {
     socket.emit("removeUser", {
       channelId: currentChannel.value.id,
-      userId,
+      userId: userId,
       removerId: user.value.id,
     });
   }
 };
 
+const joinChannel = (channelId: string) => {
+  if (user.value) {
+    socket.emit("joinChannel", {
+      channelId,
+      userId: user.value.id,
+    });
+    currentChannel.value =
+      channels.value.find((c) => c.id === channelId) || null;
+  }
+};
+
 onMounted(() => {
   socket.on("message", (data: { user: User; message: string }) => {
+    console.log("received message", data);
     messages.value.push(data);
   });
 
-  socket.on("userRemoved", (data: { channelId: string; userId: string }) => {
-    if (currentChannel.value?.id === data.channelId) {
-      currentChannel.value.users = currentChannel.value.users.filter(u => u.id !== data.userId);
+  socket.on(
+    "userRemoved",
+    (data: { channelId: string; userId: string }) => {
+      if (
+        currentChannel.value &&
+        currentChannel.value.id === data.channelId
+      ) {
+        currentChannel.value.users = currentChannel.value.users.filter(
+          (u) => u.id !== data.userId
+        );
+      }
+    }
+  );
+
+  socket.on("userJoined", (data: { channelId: string; user: User }) => {
+    if (
+      currentChannel.value &&
+      currentChannel.value.id === data.channelId
+    ) {
+      currentChannel.value.users.push(data.user);
     }
   });
 
-  socket.on("userJoined", (data: { channelId: string; user: User }) => {
-    if (currentChannel.value?.id === data.channelId) {
-      currentChannel.value.users.push(data.user);
-    }
+  socket.emit("getChannels", (channelsList: Channel[]) => {
+    channels.value = channelsList;
   });
 });
 </script>
