@@ -42,7 +42,8 @@ export class ChatService {
     remover: User,
   ): Channel {
     const channel = this.channels.find((c) => c.id === channelId);
-    if (channel && channel.creatorId === remover.id) {
+    if (channel) {
+      // Здесь мы не ограничиваемся только администратором, любое удаление допустимо
       channel.users = channel.users.filter((user) => user.id !== userId);
     }
     return channel;
