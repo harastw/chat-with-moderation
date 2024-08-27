@@ -93,11 +93,14 @@ export class ChatGateway {
     if (!remover) {
       throw new Error(`Remover with id ${data.removerId} not found`);
     }
+    
     const channel = this.chatService.removeUserFromChannel(
       data.channelId,
       data.userId,
       remover,
     );
+
+    this.server.to(channel.id).emit('userRemoved', { channelId: channel.id, userId: data.userId });
 
     client.leave(channel.id);
 
